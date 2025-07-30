@@ -1,0 +1,152 @@
+services:
+  # Percona Server Master
+  mysql-master:
+    image: percona/percona-server:8.0.42-33
+    platform: linux/amd64
+    container_name: mysql-master
+    hostname: mysql-master
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass123
+      MYSQL_DATABASE: testdb
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mysql-config/master.cnf:/etc/mysql/conf.d/master.cnf
+      - ./init-scripts:/docker-entrypoint-initdb.d
+      - mysql-master-data:/var/lib/mysql
+    networks:
+      - mysql-cluster
+    restart: unless-stopped
+    command: --server-id=1 --log-bin=mysql-bin --gtid-mode=ON --enforce-gtid-consistency=ON
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpass123"]
+      timeout: 20s
+      retries: 10
+
+  # Percona Server Slave 1
+  mysql-slave1:
+    image: percona/percona-server:8.0.42-33
+    platform: linux/amd64
+    container_name: mysql-slave1
+    hostname: mysql-slave1
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass123
+      MYSQL_DATABASE: testdb
+    ports:
+      - "3307:3306"
+    volumes:
+      - ./mysql-config/slave.cnf:/etc/mysql/conf.d/slave.cnf
+      - mysql-slave1-data:/var/lib/mysql
+    networks:
+      - mysql-cluster
+    restart: unless-stopped
+    depends_on:
+      - mysql-master
+    command: --server-id=2 --log-bin=mysql-bin --gtid-mode=ON --enforce-gtid-consistency=ON --read-only=1
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpass123"]
+      timeout: 20s
+      retries: 10
+
+  # Percona Server Slave 2
+  mysql-slave2:
+    image: percona/percona-server:8.0.42-33
+    platform: linux/amd64
+    container_name: mysql-slave2
+    hostname: mysql-slave2
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass123
+      MYSQL_DATABASE: testdb
+    ports:
+      - "3308:3306"
+    volumes:
+      - ./mysql-config/slave.cnf:/etc/mysql/conf.d/slave.cnf
+      - mysql-slave2-data:/var/lib/mysql
+    networks:
+      - mysql-cluster
+    restart: unless-stopped
+    depends_on:
+      - mysql-master
+    command: --server-id=3 --log-bin=mysql-bin --gtid-mode=ON --enforce-gtid-consistency=ON --read-only=1
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpass123"]
+      timeout: 20s
+      retries: 10
+
+  # ProxySQL
+  proxysql:
+    image: proxysql/proxysql:2.4.8
+    platform: linux/amd64
+    container_name: proxysql
+    hostname: proxysql
+    ports:
+      - "6032:6032"  # Admin interface
+      - "6033:6033"  # MySQL interface
+      - "6080:6080"  # UI
+    volumes:
+      - ./proxysql-config/proxysql.cnf:/etc/proxysql.cnf
+    networks:
+      - mysql-cluster
+    restart: unless-stopped
+    depends_on:
+      mysql-master:
+        condition: service_healthy
+      mysql-slave1:
+        condition: service_healthy
+      mysql-slave2:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "mysql", "-h", "127.0.0.1", "-P", "6032", "-u", "admin", "-padmin", "-e", "SELECT 1"]
+      timeout: 20s
+      retries: 10
+
+  # Orchestrator
+  orchestrator:
+    image: percona/percona-orchestrator:3.2.6-17
+    platform: linux/amd64
+    container_name: orchestrator
+    hostname: orchestrator
+    ports:
+      - "3000:3000"  # Web UI
+    volumes:
+      - ./orchestrator-config/orchestrator.conf.json:/etc/orchestrator/orchestrator.conf.json
+      - ./orchestrator-config/proxysql-reconfig.sh:/etc/orchestrator/proxysql-reconfig.sh
+    networks:
+      - mysql-cluster
+    restart: unless-stopped
+    depends_on:
+      mysql-master:
+        condition: service_healthy
+      mysql-slave1:
+        condition: service_healthy
+      mysql-slave2:
+        condition: service_healthy
+    environment:
+      ORC_TOPOLOGY_USER: orchestrator
+      ORC_TOPOLOGY_PASSWORD: orchpass123
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/status"]
+      timeout: 20s
+      retries: 10
+
+## Debug tools
+  # net-tools:
+  #   image: percona/percona-server:8.0.42-33
+  #   container_name: tools
+  #   platform: linux/amd64
+  #   # entrypoint: ["sleep", "infinity"]
+  #   networks:
+  #     - mysql-cluster
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: rootpass123
+  #     MYSQL_DATABASE: testdb
+  #   hostname: tools
+  
+volumes:
+  mysql-master-data:
+  mysql-slave1-data:
+  mysql-slave2-data:
+
+networks:
+  mysql-cluster:
+    driver: bridge

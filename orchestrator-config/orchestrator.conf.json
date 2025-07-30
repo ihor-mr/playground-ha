@@ -1,0 +1,47 @@
+{
+    "Debug": true,
+    "LogToFile": true,
+    "LogFileLocation": "/var/log/orchestrator.log",
+    "ListenAddress": ":3000",
+    "MySQLTopologyUser": "orchestrator",
+    "MySQLTopologyPassword": "orchpass123",
+    "BackendDB": "sqlite",
+    "SQLite3DataFile": "/var/lib/orchestrator/orchestrator.db",
+    "MySQLConnectTimeoutSeconds": 1,
+    "DefaultInstancePort": 3306,
+    "DiscoverByShowSlaveHosts": false,
+    "InstancePollSeconds": 5,
+    "HostnameResolveMethod": "default",
+    "MySQLHostnameResolveMethod": "none",
+    "SkipBinlogServerUnresolveCheck": true,
+    "AutoFailover": true,
+    "AutoMasterFailover": true,
+    "AutoRecoverMaster": true,
+    "AutoRecoverIntermediateMaster": true,
+    "FailoverOnMasterFailure": true,
+    "DetectMasterFailureAfterSeconds": 10,
+    "CandidatePoolMinInstancesCount": 1,
+    "CandidatePoolInstancesUnhealthyThresholdCount": 1,
+    "CandidatePoolReadOnly": true,
+    "CandidatePoolCheckConnectivity": true,
+    "SkipMasterFailoverOnLagSeconds": 120,
+    "RecoveryPeriodBlockMinutes": 0,
+    "FailoverPeriodBlockMinutes": 0,
+    "RecoverMasterClusterFilters": [
+        "*"
+    ],
+    "RecoverIntermediateMasterClusterFilters": [
+        "*"
+    ],
+    "PromotionIgnoreHostnameFilters": [],
+    "PromotionIgnoreReplicas": false,
+    "RecoveryIgnoreHostnameFilters": [],
+    "RecoveryIgnoreReplicas": false,
+    "ClusterNameToAlias": {
+        "mysql-master:3306": "master"
+    },
+    "FailMasterPromotionOnLagMinutes": 5,
+    "ReplicationLagQuery": "SELECT GREATEST(0, UNIX_TIMESTAMP() - UNIX_TIMESTAMP(ts)) AS Seconds_Behind_Master FROM testdb.heartbeat",
+    "MasterFailoverDetachReplicaMasterHost": true,
+    "ApplyMySQLPromotionAfterMasterFailover": true
+}

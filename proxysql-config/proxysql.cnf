@@ -1,0 +1,150 @@
+datadir="/var/lib/proxysql"
+
+admin_variables=
+{
+  admin_credentials="admin:admin"
+  mysql_ifaces="0.0.0.0:6032"
+  web_enabled = true
+  web_port = 6080
+  debug=true
+  # Enable admin interface logging
+  admin_log_level=6
+}
+
+mysql_variables=
+{
+  threads=4
+  max_connections=1000000
+  poll_timeout=2000
+  interfaces="0.0.0.0:6033"
+  default_schema="information_schema"
+  stacksize=1048576
+  server_version="8.0.42"
+  connect_timeout_server=3000
+  monitor_username="monitor"
+  monitor_password="monpass123"
+  monitor_history=600000
+  monitor_connect_interval=60000
+  monitor_ping_interval=10000
+  monitor_read_only_interval=1500
+  monitor_read_only_timeout=500
+  monitor_replication_lag_interval=10000
+  monitor_replication_lag_timeout=1000
+  monitor_slave_lag_when_null=60
+  monitor_threads_min=8
+  monitor_threads_max=128
+  monitor_threads_queue_maxsize=128
+  ping_interval_server_msec=120000
+  ping_timeout_server=500
+  commands_stats=true
+  sessions_sort=true
+  connect_retries_on_failure=10
+  
+  # =============================================
+  # LOGGING CONFIGURATION FOR SQL QUERIES
+  # =============================================
+  
+  # Enable debug logging (shows detailed query processing)
+  log_debug=true
+  
+  # Enable verbose query error logging
+  verbose_query_error=true
+  
+  # Log unhealthy connections
+  log_unhealthy_connections=true
+  
+  # Enable event logging for all queries
+  eventslog_filename="/var/lib/proxysql/queries.log"
+  eventslog_filesize=104857600
+  eventslog_default_log=1
+  eventslog_format=2
+  
+  # Enable query digest (stores query patterns and statistics)
+  query_digests=true
+  query_digests_max_digest_length=2048
+  query_digests_max_query_length=65000
+  query_digests_normalize_digest_text=true
+  query_digests_track_hostname=true
+  
+  # Enable query cache logging (optional)
+  query_cache_size_MB=256
+  
+  # Enable connection logging
+  log_mysql_warnings_enabled=true
+  
+  # Set logging levels for more verbosity
+  mysql_log_level=6
+  
+  # Enable stats for detailed monitoring
+  stats_time_backend_query=true
+  stats_time_query_processor=true
+  
+  # Monitor query execution times
+  default_query_delay=0
+  default_query_timeout=36000000
+  
+  # Enable multiplexing logging
+  multiplexing=true
+  log_multiplexing_errors=true
+}
+
+mysql_servers =
+(
+  { address="mysql-master", port=3306, hostgroup=0, weight=10000 },
+  { address="mysql-slave1", port=3306, hostgroup=1, weight=900 }, 
+  { address="mysql-slave2", port=3306, hostgroup=1, weight=900 }
+)
+
+mysql_users =
+(
+  { username="appuser", password="apppass123", default_hostgroup=0, active=1 }
+)
+
+mysql_query_rules =
+(
+  {
+    rule_id=1
+    active=1
+    match_pattern="^SELECT .*"
+    destination_hostgroup=1
+    apply=1
+    log=1
+    comment="Route SELECT queries to slaves"
+  },
+  {
+    rule_id=2  
+    active=1
+    match_pattern="^(INSERT|UPDATE|DELETE|REPLACE|CREATE|DROP|ALTER|TRUNCATE).*"
+    destination_hostgroup=0
+    apply=1
+    log=1
+    comment="Route write queries to master"
+  },
+  {
+    rule_id=3
+    active=1
+    match_pattern="^BEGIN"
+    destination_hostgroup=0
+    apply=1
+    log=1
+    comment="Route transactions to master"
+  },
+  {
+    rule_id=4
+    active=1
+    match_pattern="^COMMIT"
+    destination_hostgroup=0  
+    apply=1
+    log=1
+    comment="Route commits to master"
+  },
+  {
+    rule_id=5
+    active=1
+    match_pattern="^ROLLBACK"
+    destination_hostgroup=0
+    apply=1
+    log=1
+    comment="Route rollbacks to master"
+  }
+)

@@ -1,0 +1,41 @@
+[mysqld]
+# Server identification
+server-id = 1
+
+# Disable SSL requirement for simpler setup
+require_secure_transport = OFF
+ssl = 0
+
+# Binary logging
+log-bin = mysql-bin
+log-slave-updates = ON
+binlog-format = ROW
+expire-logs-days = 7
+
+# GTID configuration
+gtid-mode = ON
+enforce-gtid-consistency = ON
+
+# Replication settings
+sync-binlog = 1
+binlog-checksum = CRC32
+master-verify-checksum = 1
+slave-sql-verify-checksum = 1
+
+# Performance settings
+innodb-flush-log-at-trx-commit = 1
+sync-master-info = 1
+sync-relay-log = 1
+sync-relay-log-info = 1
+
+# Network settings
+bind-address = 0.0.0.0
+max-connections = 200
+
+# Logging
+log-error = /var/log/mysql/error.log
+slow-query-log = 1
+slow-query-log-file = /var/log/mysql/slow.log
+long-query-time = 2
+
+event_scheduler = ON
