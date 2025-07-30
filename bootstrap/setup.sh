@@ -1,15 +1,10 @@
 #!/bin/bash
 
-# MySQL Cluster Setup Script
 # This script sets up replication and configures the cluster
 
 set -e
 
 echo "Starting MySQL Cluster Setup..."
-
-# Wait for MySQL services to be ready
-echo "Waiting for MySQL services to start..."
-sleep 10
 
 # Function to wait for MySQL to be ready
 wait_for_mysql() {
@@ -40,19 +35,19 @@ wait_for_mysql mysql-slave2 3306
 
 echo "Setting up replication..."
 
+# Reset slaves first
 for SLAVE in mysql-slave1 mysql-slave2; do
   echo "Resetting $SLAVE..."
   docker exec $SLAVE mysql -uroot -prootpass123 -e "
     STOP REPLICA;
     RESET REPLICA ALL;
     RESET MASTER;
-  "
+  " 2>/dev/null || echo "Reset completed for $SLAVE"
 done
 
-# Configure replication on slaves
+# Configure replication on slaves - UNCOMMENTED AND FIXED
 echo "Configuring slave1..."
 docker exec mysql-slave1 mysql -uroot -prootpass123 -e "
-STOP REPLICA;
 CHANGE REPLICATION SOURCE TO 
     SOURCE_HOST='mysql-master',
     SOURCE_USER='replicator',
@@ -63,7 +58,6 @@ START REPLICA;
 
 echo "Configuring slave2..."
 docker exec mysql-slave2 mysql -uroot -prootpass123 -e "
-STOP REPLICA;
 CHANGE REPLICATION SOURCE TO 
     SOURCE_HOST='mysql-master',
     SOURCE_USER='replicator',
@@ -73,44 +67,48 @@ START REPLICA;
 "
 
 echo "Waiting for replication to sync..."
-sleep 10
+sleep 15
 
 # Check replication status
 echo "Checking replication status..."
 echo "=== Slave 1 Status ==="
-docker exec mysql-slave1 mysql -uroot -prootpass123 -e "SHOW SLAVE STATUS\G" | grep -E "(Slave_IO_Running|Slave_SQL_Running|Seconds_Behind_Master)"
+docker exec mysql-slave1 mysql -uroot -prootpass123 -e "SHOW REPLICA STATUS\G" | grep -E "(Replica_IO_Running|Replica_SQL_Running|Seconds_Behind_Source)"
 
 echo "=== Slave 2 Status ==="
-docker exec mysql-slave2 mysql -uroot -prootpass123 -e "SHOW SLAVE STATUS\G" | grep -E "(Slave_IO_Running|Slave_SQL_Running|Seconds_Behind_Master)"
+docker exec mysql-slave2 mysql -uroot -prootpass123 -e "SHOW REPLICA STATUS\G" | grep -E "(Replica_IO_Running|Replica_SQL_Running|Seconds_Behind_Source)"
 
-# # Wait for ProxySQL and configure it
+# Wait for ProxySQL and configure it
 echo "Waiting for ProxySQL to start..."
-sleep 15
+sleep 10
 
-# echo "Initializing Orchestrator database..."
-# docker exec orchestrator /usr/local/orchestrator/orchestrator -c redeploy-internal-db || echo "Database initialization completed"
+# Load ProxySQL configuration - UNCOMMENTED
+echo "Loading ProxySQL configuration..."
+docker exec proxysql mysql -uadmin -padmin -h127.0.0.1 -P6032 -e "
+LOAD MYSQL SERVERS TO RUNTIME; 
+SAVE MYSQL SERVERS TO DISK;
+LOAD MYSQL USERS TO RUNTIME; 
+SAVE MYSQL USERS TO DISK;
+LOAD MYSQL QUERY RULES TO RUNTIME; 
+SAVE MYSQL QUERY RULES TO DISK;
+"
 
-# # Add master to orchestrator
-docker exec orchestrator orchestrator-client -c discover -i mysql-master:3306
+# Add servers to Orchestrator for discovery - UNCOMMENTED
+echo "Adding servers to Orchestrator..."
+docker exec orchestrator orchestrator-client -c discover -i mysql-master:3306 || echo "Master discovery may have failed, will retry"
 
-# # # Add slave to orchestrator
-# docker exec orchestrator orchestrator-client -c discover -i mysql-slave1:3306
+# Wait a bit for discovery
+sleep 10
 
-# # # Add slave to orchestrator
-# docker exec orchestrator orchestrator-client -c discover -i mysql-slave2:3306
+# Show final status
+echo "=== Final Status Check ==="
+echo "Orchestrator clusters:"
+docker exec orchestrator orchestrator-client -c clusters || echo "Clusters command failed"
 
-# # #####
-# docker exec -it proxysql mysql -uadmin -padmin -h127.0.0.1 -P6032 -e "
-# LOAD MYSQL SERVERS TO RUNTIME; SAVE MYSQL SERVERS TO DISK;
-# LOAD MYSQL USERS TO RUNTIME; SAVE MYSQL USERS TO DISK;
-# LOAD MYSQL QUERY RULES TO RUNTIME; SAVE MYSQL QUERY RULES TO DISK;"
+echo "Orchestrator topology:"
+docker exec orchestrator orchestrator-client -c topology -i mysql-master:3306 || echo "Topology command failed"
 
-# # Discover topology
-# curl -s "http://orchestrator:3000/api/discover/mysql-master/3306" || echo "API discovery for master may have failed"
-# sleep 2
-# curl -s "http://orchestrator:3000/api/discover/mysql-slave1/3306" || echo "API discovery for master may have failed"
-# sleep 2
-# curl -s "http://orchestrator:3000/api/discover/mysql-slave2/3306" || echo "API discovery for master may have failed"
+echo "ProxySQL servers:"
+docker exec proxysql mysql -uadmin -padmin -h127.0.0.1 -P6032 -e "SELECT hostgroup_id, hostname, port, status FROM mysql_servers;" || echo "ProxySQL query failed"
 
 echo "Setup completed! Services available at:"
 echo "- MySQL Master: localhost:3306"

@@ -15,9 +15,11 @@ services:
       - ./init-scripts:/docker-entrypoint-initdb.d
       - mysql-master-data:/var/lib/mysql
     networks:
-      - mysql-cluster
+      mysql-cluster:
+        aliases:
+          - mysql-master
     restart: unless-stopped
-    command: --server-id=1 --log-bin=mysql-bin --gtid-mode=ON --enforce-gtid-consistency=ON
+    command: --server-id=1 --log-bin=mysql-bin --gtid-mode=ON --enforce-gtid-consistency=ON --report_host=mysql-master
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpass123"]
       timeout: 20s
@@ -38,11 +40,13 @@ services:
       - ./mysql-config/slave.cnf:/etc/mysql/conf.d/slave.cnf
       - mysql-slave1-data:/var/lib/mysql
     networks:
-      - mysql-cluster
+      mysql-cluster:
+        aliases:
+          - mysql-slave1
     restart: unless-stopped
     depends_on:
       - mysql-master
-    command: --server-id=2 --log-bin=mysql-bin --gtid-mode=ON --enforce-gtid-consistency=ON --read-only=1
+    command: --server-id=2 --log-bin=mysql-bin --gtid-mode=ON --enforce-gtid-consistency=ON --read-only=1 --report_host=mysql-slave1
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpass123"]
       timeout: 20s
@@ -63,11 +67,13 @@ services:
       - ./mysql-config/slave.cnf:/etc/mysql/conf.d/slave.cnf
       - mysql-slave2-data:/var/lib/mysql
     networks:
-      - mysql-cluster
+      mysql-cluster:
+        aliases:
+          - mysql-slave2
     restart: unless-stopped
     depends_on:
       - mysql-master
-    command: --server-id=3 --log-bin=mysql-bin --gtid-mode=ON --enforce-gtid-consistency=ON --read-only=1
+    command: --server-id=3 --log-bin=mysql-bin --gtid-mode=ON --enforce-gtid-consistency=ON --read-only=1 --report_host=mysql-slave2
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpass123"]
       timeout: 20s
@@ -110,7 +116,7 @@ services:
       - "3000:3000"  # Web UI
     volumes:
       - ./orchestrator-config/orchestrator.conf.json:/etc/orchestrator/orchestrator.conf.json
-      - ./orchestrator-config/proxysql-reconfig.sh:/etc/orchestrator/proxysql-reconfig.sh
+      - ./orchestrator-config/post-failover.sh:/etc/orchestrator/post-failover.sh
     networks:
       - mysql-cluster
     restart: unless-stopped
@@ -129,19 +135,6 @@ services:
       timeout: 20s
       retries: 10
 
-## Debug tools
-  # net-tools:
-  #   image: percona/percona-server:8.0.42-33
-  #   container_name: tools
-  #   platform: linux/amd64
-  #   # entrypoint: ["sleep", "infinity"]
-  #   networks:
-  #     - mysql-cluster
-  #   environment:
-  #     MYSQL_ROOT_PASSWORD: rootpass123
-  #     MYSQL_DATABASE: testdb
-  #   hostname: tools
-  
 volumes:
   mysql-master-data:
   mysql-slave1-data:

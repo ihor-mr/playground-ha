@@ -8,25 +8,6 @@ This setup provides a fault-tolerant MySQL cluster using Percona Server, ProxySQ
 - **1x ProxySQL 2.4.8**: Load balancer and connection pooler
 - **1x Orchestrator 3.2.6-9**: Automatic failover management
 
-## Directory Structure
-
-```
-.
-├── docker-compose.yml
-├── setup.sh
-├── test-cluster.sh
-├── README.md
-├── init-scripts/
-│   └── 01-users.sql
-├── mysql-config/
-│   ├── master.cnf
-│   └── slave.cnf
-├── proxysql-config/
-│   └── proxysql.cnf
-└── orchestrator-config/
-    └── orchestrator.conf.json
-```
-
 ## Quick Start
 
 1. **Clone/create the directory structure** with all configuration files
@@ -36,25 +17,20 @@ This setup provides a fault-tolerant MySQL cluster using Percona Server, ProxySQ
    docker-compose up -d
    ```
 
-3. **Run the setup script:**
+3. **Run the setup script that create the cluster:**
    ```bash
-   chmod +x setup.sh
-   ./setup.sh
+   ./bootstrap/setup.sh
    ```
 
 4. **Test the cluster:**
+- Below script shutdown the cluster for 30 seconds to show that master failure and slave is promoted automatically
    ```bash
-   chmod +x test-cluster.sh
-   ./test-cluster.sh
+   ./tests/1-master-stop-start.sh
+   ```
+- Below script on master recovery rejoins as slave. It can be done maybe with hooks but for the test puruses implemented like this
+   ```bash
+   ./tests/2-rejoin-old-master.sh
    ```
 
-## Service Endpoints
-
-| Service | Port | Credentials | Purpose |
-|---------|------|-------------|---------|
-| MySQL Master | 3306 | root/rootpass123 | Direct access to master |
-| MySQL Slave1 | 3307 | root/rootpass123 | Direct access to slave1 |
-| MySQL Slave2 | 3308 | root/rootpass123 | Direct access to slave2 |
-| ProxySQL MySQL | 6033 | appuser/  
-
-
+SELECT rule_id, match_pattern, destination_hostgroup, apply, active FROM mysql_query_rules ORDER BY rule_id;
+SELECT hostgroup, digest_text, count_star  FROM stats.stats_mysql_query_digest  ORDER BY count_star DESC LIMIT 10;
