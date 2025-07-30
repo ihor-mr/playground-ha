@@ -31,6 +31,3 @@ This setup provides a fault-tolerant MySQL cluster using Percona Server, ProxySQ
    ```bash
    ./tests/2-rejoin-old-master.sh
    ```
-
-SELECT rule_id, match_pattern, destination_hostgroup, apply, active FROM mysql_query_rules ORDER BY rule_id;
-SELECT hostgroup, digest_text, count_star  FROM stats.stats_mysql_query_digest  ORDER BY count_star DESC LIMIT 10;
